@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Conda environment artifacts
+.env/
+*.conda
+*.env
+*.venv
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode settings
+.vscode/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Jupyter runtime and kernel metadata
+*.nbconvert.ipynb
+.ipython/
+.jupyter/
+
+# Logs and debugging
+*.log
+*.out
+
+# Python egg info
+*.egg-info/
+dist/
+build/
+
+# Environments
+.env/
+*.yml.lock
+
