@@ -8,6 +8,7 @@ pandas>=1.4.2
 scikit-learn>=1.0.2
 scipy>=1.7.3
 seaborn>=0.11
+timm
 torch>=1.9.0
 torchvision
 torchaudio

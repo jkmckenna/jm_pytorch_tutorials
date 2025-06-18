@@ -37,3 +37,5 @@ build/
 .env/
 *.yml.lock
 
+# Datasets
+data/
