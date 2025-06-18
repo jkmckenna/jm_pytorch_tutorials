@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import torch
 
 def plot_feature_maps(input_image, maps, title="Conv1 Activations"):
     num_maps = maps.shape[0]
@@ -30,6 +31,23 @@ def plot_feature_maps(input_image, maps, title="Conv1 Activations"):
     plt.tight_layout()
     plt.show()
 
+def plot_dense_activation(activations, title=None, softmax=True):
+    """
+    Plot 1D dense activations as a bar chart.
+    """
+
+    if softmax:
+        activations = torch.softmax(activations, dim=0).cpu().numpy()
+    else:
+        activations = activations.cpu().numpy()
+    plt.figure(figsize=(10, 3))
+    plt.bar(np.arange(len(activations)), activations)
+    plt.title(title or "Dense Layer Activations")
+    plt.xlabel("Neuron Index")
+    plt.ylabel("Activation")
+    plt.tight_layout()
+    plt.show()
+
 def plot_conv_filters(weights, title="Conv Filters"):
     num_filters = weights.shape[0]
     num_cols = 8
@@ -49,7 +67,9 @@ def plot_conv_filters(weights, title="Conv Filters"):
 
 def show_saliency_map(image, saliency):
     fig, axes = plt.subplots(1, 2, figsize=(8, 4))
-    axes[0].imshow(image.squeeze(), cmap='gray')
+    # Convert (C, H, W) → (H, W, C)
+    img_np = image.permute(1, 2, 0).cpu().numpy()
+    axes[0].imshow(img_np)
     axes[0].set_title("Original Image")
     axes[1].imshow(saliency, cmap='hot')
     axes[1].set_title("Saliency Map")
