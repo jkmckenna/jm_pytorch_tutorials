@@ -2,6 +2,12 @@ import torch
 from torch import nn
 from sklearn.base import BaseEstimator
 
+from torchvision.models import resnet18, ResNet18_Weights
+import timm
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
+
+
 import time
 
 from ..utils import get_device
@@ -116,3 +122,51 @@ class CNN(nn.Module):
         x = x.view(x.size(0), -1)
         return self.fc(x)
 
+class ResNet18Classifier(nn.Module):
+    def __init__(self, num_classes=None, pretrained=True):
+        super().__init__()
+        self.model = resnet18(weights=ResNet18_Weights.DEFAULT if pretrained else None)
+        self.device = get_device()
+        if num_classes is not None:
+            in_features = self.model.fc.in_features
+            self.model.fc = nn.Linear(in_features, num_classes)
+        self.transform = ResNet18_Weights.DEFAULT.transforms() if pretrained else None
+        self.layers_to_track = ['conv1', 'relu', 'layer1.0.conv1', 'layer1.0.relu']
+
+    def forward(self, x):
+        return self.model(x)
+
+    def preprocess(self, image):
+        return self.transform(image) if self.transform else image
+
+
+class ViTClassifier(nn.Module):
+    def __init__(self, model_name='vit_base_patch16_224', num_classes=None, pretrained=True):
+        super().__init__()
+        self.model = timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes)
+        self.device = get_device()
+        config = resolve_data_config({}, model=self.model)
+        self.transform = create_transform(**config)
+        self.layers_to_track = ['blocks.0.attn', 'blocks.1.attn', 'blocks.2.attn', 'blocks.3.attn']
+
+    def forward(self, x):
+        return self.model(x)
+
+    def preprocess(self, image):
+        return self.transform(image)
+
+
+class ConvNeXtClassifier(nn.Module):
+    def __init__(self, model_name='convnext_base', num_classes=None, pretrained=True):
+        super().__init__()
+        self.model = timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes)
+        self.device = get_device()
+        config = resolve_data_config({}, model=self.model)
+        self.transform = create_transform(**config)
+        self.layers_to_track = ['stem.0', 'stages.0.blocks.0.conv_dw', 'stages.0.blocks.0.mlp.act']
+
+    def forward(self, x):
+        return self.model(x)
+
+    def preprocess(self, image):
+        return self.transform(image)

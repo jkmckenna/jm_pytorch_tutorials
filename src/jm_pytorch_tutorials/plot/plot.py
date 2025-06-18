@@ -3,32 +3,58 @@ import numpy as np
 import math
 import torch
 
-def plot_feature_maps(input_image, maps, title="Conv1 Activations"):
+def plot_feature_maps(input_image, maps, title="Conv Layer Activations"):
+    """
+    Plot the input image (raw) and a set of feature maps (in viridis) from a CNN layer.
+
+    Parameters:
+        input_image (Tensor): shape [C, H, W] or [H, W]
+        maps (Tensor): shape [N, H, W], the feature maps
+        title (str): optional plot title
+    """
     num_maps = maps.shape[0]
     num_cols = 8
-    total_maps = num_maps + 1  # +1 for input image
+    total_maps = num_maps + 1  # include input image
     num_rows = (total_maps + num_cols - 1) // num_cols
 
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=(num_cols, num_rows))
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(num_cols * 1.5, num_rows * 1.5), constrained_layout=True)
     axes = axes.flatten()
 
-    # Plot the input image first
-    axes[0].imshow(input_image.squeeze(), cmap='gray')
-    axes[0].set_title("Input Image")
-    axes[0].axis('off')
+    # Normalize feature maps for consistent color scaling
+    vmin = maps.min().item()
+    vmax = maps.max().item()
+    img_handle = None  # to save one imshow handle for the colorbar
 
-    # Plot activation maps
+    # Plot the input image (raw, grayscale or RGB)
+    ax = axes[0]
+    img = input_image.cpu()
+    if img.ndim == 3 and img.shape[0] != 1:  # [C, H, W]
+        img = img.permute(1, 2, 0).numpy()
+        ax.imshow(img)  # Let matplotlib infer RGB or grayscale
+    else:
+        img = img.squeeze().numpy()
+        ax.imshow(img, cmap='gray')
+    ax.set_title("Input Image")
+    ax.axis('off')
+
+    # Plot the feature maps
     for i in range(num_maps):
         ax = axes[i + 1]
-        ax.imshow(maps[i], cmap='viridis')
+        im = ax.imshow(maps[i].cpu(), cmap='viridis', vmin=vmin, vmax=vmax)
         ax.axis('off')
+        if img_handle is None:
+            img_handle = im  # save handle for colorbar
 
-    # Hide unused axes
+    # Hide any unused axes
     for j in range(num_maps + 1, len(axes)):
         axes[j].axis('off')
 
+    # Add shared colorbar to the right
+    if img_handle:
+        cbar = fig.colorbar(img_handle, ax=axes, location='right', shrink=0.8, pad=0.02)
+        cbar.set_label("Activation Intensity")
+
     plt.suptitle(title)
-    plt.tight_layout()
     plt.show()
 
 def plot_dense_activation(activations, title=None, softmax=True):
@@ -49,30 +75,93 @@ def plot_dense_activation(activations, title=None, softmax=True):
     plt.show()
 
 def plot_conv_filters(weights, title="Conv Filters"):
+    """
+    Plot convolutional filters with a shared intensity scale bar (colorbar).
+
+    Parameters:
+        weights (Tensor or ndarray): shape [out_channels, in_channels, H, W]
+        title (str): plot title
+    """
     num_filters = weights.shape[0]
     num_cols = 8
     num_rows = (num_filters + num_cols - 1) // num_cols
 
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=(num_cols, num_rows))
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(num_cols, num_rows), constrained_layout=True)
+    axes = axes.flatten()
+
+    # Collect all weights for consistent vmin/vmax
+    all_weights = weights[:, 0]  # assuming single input channel
+    vmin = all_weights.min().item()
+    vmax = all_weights.max().item()
+
+    img_handle = None
     for i in range(num_filters):
-        ax = axes[i // num_cols, i % num_cols]
-        w = weights[i, 0]  # Assuming single input channel (e.g. grayscale)
-        ax.imshow(w, cmap='gray')
+        ax = axes[i]
+        w = weights[i, 0]  # shape: [H, W]
+        img_handle = ax.imshow(w, cmap='gray', vmin=vmin, vmax=vmax)
         ax.axis('off')
-    for j in range(i + 1, num_rows * num_cols):
-        axes[j // num_cols, j % num_cols].axis('off')
+
+    for j in range(num_filters, len(axes)):
+        axes[j].axis('off')
+
+    # Add colorbar
+    cbar = fig.colorbar(img_handle, ax=axes, location='right', shrink=0.8, pad=0.02)
+    cbar.set_label("Filter Weight (Intensity)")
+
     plt.suptitle(title)
+    plt.show()
+
+def show_saliency_map(image, saliency_map, title=None):
+    """
+    Plot the input image and corresponding saliency map side by side.
+
+    Args:
+        image (torch.Tensor): input image, shape [C, H, W]
+        saliency_map (torch.Tensor): saliency map, shape [H, W]
+        title (str): optional plot title
+    """
+    image = image.detach().cpu()
+    saliency_map = saliency_map.detach().cpu()
+
+    fig, axes = plt.subplots(1, 2, figsize=(4, 2))
+
+    # Convert image to (H, W, C) if needed
+    if image.ndim == 3 and image.shape[0] in [1, 3]:
+        img_disp = image.permute(1, 2, 0).numpy()
+        if image.shape[0] == 1:  # grayscale
+            img_disp = img_disp.squeeze(-1)
+        axes[0].imshow(img_disp, cmap='gray' if image.shape[0] == 1 else None)
+    else:
+        axes[0].imshow(image.numpy(), cmap='gray')
+
+    axes[0].set_title("Original Image")
+    axes[0].axis('off')
+
+    axes[1].imshow(saliency_map, cmap='hot')
+    axes[1].set_title("Saliency Map")
+    axes[1].axis('off')
+
+    if title:
+        fig.suptitle(title, fontsize=14)
+
     plt.tight_layout()
     plt.show()
 
-def show_saliency_map(image, saliency):
+def plot_saliency_map(image, saliency, title=None):
+    """
+    image: torch.Tensor [C, H, W]
+    saliency: torch.Tensor [C, H, W] or [H, W]
+    """
+    image_np = image.permute(1, 2, 0).cpu().numpy()
+    saliency_np = saliency.mean(dim=0).numpy() if saliency.ndim == 3 else saliency.numpy()
+
     fig, axes = plt.subplots(1, 2, figsize=(8, 4))
-    # Convert (C, H, W) → (H, W, C)
-    img_np = image.permute(1, 2, 0).cpu().numpy()
-    axes[0].imshow(img_np)
+    axes[0].imshow(image_np)
     axes[0].set_title("Original Image")
-    axes[1].imshow(saliency, cmap='hot')
+    axes[1].imshow(saliency_np, cmap="hot")
     axes[1].set_title("Saliency Map")
+    if title:
+        fig.suptitle(title)
     plt.tight_layout()
     plt.show()
 

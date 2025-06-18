@@ -47,12 +47,51 @@ def get_conv_filters(conv_layer):
     weights = conv_layer.weight.data.clone().cpu()
     return weights
 
-def compute_saliency(model, image, label):
+def compute_saliency(model, image, label, reduce_channels="max"):
+    """
+    Compute a 2D saliency map for a single input image with flexible channel reduction.
+
+    Args:
+        model (torch.nn.Module): the trained model
+        image (torch.Tensor): input image of shape [C, H, W]
+        label (int): ground-truth label
+        reduce_channels (str): one of {"max", "mean", "norm"}
+
+    Returns:
+        torch.Tensor: saliency map of shape [H, W]
+    """
     model.eval()
-    image = image.unsqueeze(0).to(model.device).requires_grad_()
+    device = model.device
+
+    image = image.unsqueeze(0).to(device).requires_grad_()  # [1, C, H, W]
+    label_tensor = torch.tensor([label], device=device)
+
     output = model(image)
-    loss = F.cross_entropy(output, torch.tensor([label]).to(model.device))
+    loss = F.cross_entropy(output, label_tensor)
     loss.backward()
 
-    saliency = image.grad.abs().squeeze().cpu()
-    return saliency
+    grads = image.grad.abs().squeeze(0)  # [C, H, W]
+
+    if reduce_channels == "max":
+        saliency_map = grads.max(dim=0)[0]
+    elif reduce_channels == "mean":
+        saliency_map = grads.mean(dim=0)
+    elif reduce_channels == "norm":
+        saliency_map = grads.norm(p=2, dim=0)
+    else:
+        raise ValueError(f"Unknown reduce_channels method: {reduce_channels}")
+
+    return saliency_map.cpu()
+
+def compute_saliency_map(model, image, label=None, device=None):
+    model.eval()
+    device = device or next(model.parameters()).device
+    image = image.to(device).unsqueeze(0).requires_grad_()
+
+    output = model(image)  # logits
+    pred_label = output.argmax(dim=1).item() if label is None else label
+    loss = F.cross_entropy(output, torch.tensor([pred_label], device=device))
+    loss.backward()
+
+    saliency = image.grad.abs().squeeze().detach().cpu()  # [C, H, W]
+    return saliency, pred_label
