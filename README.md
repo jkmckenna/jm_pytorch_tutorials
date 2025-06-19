@@ -1,5 +1,8 @@
-# pytorch_tutorials
-basic pytorch tutorials and testing
+# jm_pytorch_tutorials
+basic pytorch tutorials
+
+# Purpose
+A crash course introduction for the Tjian/Darzacq Lab into computer vision and representation learning in PyTorch. A basic (MNIST training/eval and feature map intro), intermediate (CIFAR10 training/eval and feature maps), and advanced introduction (Various pretrained Imagenet1000 models inference on new images, feature maps, attention maps) are provided.
 
 # Clone repo from source
 ```shell
